@@ -65,11 +65,10 @@ int64_t lex_rank(uint32_t mask, int S, int k) {
     return r;
 }
 
-// A flat half (a config that never trades there) scores 0, as in cscv.sharpe.
-// b - a^2/n carries rounding of order eps * b, so flatness is judged against b.
-inline double sharpe(double mu, double a, double b, double n) {
-    const double ss = b - a * a / n;
-    return ss <= 1e-12 * b ? 0.0 : (mu + a / n) / std::sqrt(ss / (n - 1));
+// A flat half (z = 0 nonzero returns: a config that never trades there) scores 0,
+// as in cscv.sharpe. Counting is exact, where a tolerance on b - a^2/n is not.
+inline double sharpe(double mu, double a, double b, double z, double n) {
+    return z == 0.0 ? 0.0 : (mu + a / n) / std::sqrt((b - a * a / n) / (n - 1));
 }
 
 }  // namespace
@@ -86,18 +85,20 @@ double cscv(const BlockStats& bs, double* logits) {
     const double len = double(bs.rows * k);
     const double* A = bs.A.data();
     const double* B = bs.B.data();
+    const double* Z = bs.Z.data();
     const double* mu = bs.shift.data();
 
-    std::vector<double> At(N, 0.0), Bt(N, 0.0);
+    std::vector<double> At(N, 0.0), Bt(N, 0.0), Zt(N, 0.0);
     for (int s = 0; s < S; ++s)
         for (int64_t n = 0; n < N; ++n) {
             At[n] += A[s * N + n];
             Bt[n] += B[s * N + n];
+            Zt[n] += Z[s * N + n];
         }
 
     #pragma omp parallel
     {
-        std::vector<double> a(N), b(N), is(N), oos(N);
+        std::vector<double> a(N), b(N), z(N), is(N), oos(N);
         int t[34];
 
         #pragma omp for schedule(dynamic)
@@ -106,12 +107,14 @@ double cscv(const BlockStats& bs, double* logits) {
             uint32_t mask = to_mask(t, k);
             std::fill(a.begin(), a.end(), 0.0);
             std::fill(b.begin(), b.end(), 0.0);
+            std::fill(z.begin(), z.end(), 0.0);
             for (uint32_t m = mask; m; m &= m - 1) {
                 const int64_t s = std::countr_zero(m);
                 #pragma omp simd
                 for (int64_t n = 0; n < N; ++n) {
                     a[n] += A[s * N + n];
                     b[n] += B[s * N + n];
+                    z[n] += Z[s * N + n];
                 }
             }
 
@@ -124,14 +127,15 @@ double cscv(const BlockStats& bs, double* logits) {
                     for (int64_t n = 0; n < N; ++n) {
                         a[n] += A[in * N + n] - A[out * N + n];
                         b[n] += B[in * N + n] - B[out * N + n];
+                        z[n] += Z[in * N + n] - Z[out * N + n];
                     }
                     mask = next;
                 }
 
                 #pragma omp simd
                 for (int64_t n = 0; n < N; ++n) {
-                    is[n] = sharpe(mu[n], a[n], b[n], len);
-                    oos[n] = sharpe(mu[n], At[n] - a[n], Bt[n] - b[n], len);
+                    is[n] = sharpe(mu[n], a[n], b[n], z[n], len);
+                    oos[n] = sharpe(mu[n], At[n] - a[n], Bt[n] - b[n], Zt[n] - z[n], len);
                 }
                 int64_t best = 0;  // first max, as np.argmax
                 for (int64_t n = 1; n < N; ++n)

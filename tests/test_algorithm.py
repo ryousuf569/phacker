@@ -7,8 +7,8 @@ from math import comb
 import numpy as np
 import pytest
 
-from src.cscv import cscv, sharpe
-from src.stats import logistic_cdf, logistic_pdf, logit_fit, n_eff, sharpe_se
+from phacker.cscv import cscv, sharpe
+from phacker.stats import logistic_cdf, logistic_pdf, logit_fit, n_eff, sharpe_se
 
 
 def traced(metric):
@@ -81,7 +81,7 @@ def test_trailing_rows_dropped():
 
 
 def test_odd_S_rejected():
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         cscv(np.zeros((30, 2)), S=5)
 
 

@@ -5,7 +5,7 @@
 
 namespace phacker {
 
-// Per-block sufficient statistics of a T x N P&L matrix. A and B are S x N,
+// Per-block sufficient statistics of a T x N P&L matrix. A, B and Z are S x N,
 // row-major, so the accumulator loop over n is unit-stride.
 struct BlockStats {
     int S = 0;
@@ -14,6 +14,7 @@ struct BlockStats {
     std::vector<double> shift;   // column means
     std::vector<double> A;       // A[s*N + n] = sum over block s of (r - shift[n])
     std::vector<double> B;       // B[s*N + n] = sum over block s of (r - shift[n])^2
+    std::vector<double> Z;       // Z[s*N + n] = count of r != 0 in block s; 0 means flat
 };
 
 int64_t n_combinations(int S);

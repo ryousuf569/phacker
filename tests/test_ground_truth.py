@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.cscv import cscv, sharpe
+from phacker.cscv import cscv, sharpe
 
 T = 1000
 ENTRY_DAYS = range(1, 23)

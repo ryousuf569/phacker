@@ -19,15 +19,20 @@ BlockStats block_stats(const double* M, int64_t T, int64_t N, int S) {
     bs.shift.assign(N, 0.0);
     bs.A.assign(S * N, 0.0);
     bs.B.assign(S * N, 0.0);
+    bs.Z.assign(S * N, 0.0);
     const int64_t L = bs.rows;
 
     #pragma omp parallel for
     for (int s = 0; s < S; ++s) {
         double* a = &bs.A[s * N];
+        double* z = &bs.Z[s * N];
         for (int64_t t = s * L; t < (s + 1) * L; ++t) {
             const double* r = M + t * N;
             #pragma omp simd
-            for (int64_t n = 0; n < N; ++n) a[n] += r[n];
+            for (int64_t n = 0; n < N; ++n) {
+                a[n] += r[n];
+                z[n] += r[n] != 0.0;
+            }
         }
     }
 
