@@ -1,13 +1,20 @@
 [build-system]
-requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+requires = ["scikit-build-core>=0.11", "nanobind>=2.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "phacker"
 version = "0.1.0"
 description = "Probability of backtest overfitting via CSCV (Bailey et al. 2016), with a C++ kernel"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = ["numpy>=1.24", "pandas>=2.0"]
+
+[project.urls]
+Source = "https://github.com/ryousuf569/phacker"
+Paper = "https://doi.org/10.21314/JCF.2016.322"
 
 [project.optional-dependencies]
 test = ["pytest"]

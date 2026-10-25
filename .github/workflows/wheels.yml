@@ -5,7 +5,7 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch:  # manual run from the Actions tab; also publishes to TestPyPI
 
 jobs:
   wheels:
@@ -17,9 +17,9 @@ jobs:
         # native runners for each arch, so no emulation or cross-compiling
         os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-15-intel, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pypa/cibuildwheel@v4.3.4
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -27,9 +27,9 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: pipx run build --sdist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -38,9 +38,47 @@ jobs:
     # the pure-Python path the package falls back to without a compiler
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - run: pip install numpy pandas pytest
       - run: pytest
+
+  # Both publish jobs use PyPI trusted publishing (OIDC), so no API token is stored.
+  # Each needs a matching publisher registered on (test.)pypi.org.
+
+  publish-testpypi:
+    needs: [wheels, sdist, numpy-reference]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true  # a version can only be uploaded once, so reruns skip it
+
+  publish-pypi:
+    needs: [wheels, sdist, numpy-reference]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Check the tag matches the package version
+        run: |
+          version=$(ls dist/*.tar.gz | sed -E 's/.*phacker-(.+)\.tar\.gz/\1/')
+          test "${GITHUB_REF_NAME#v}" = "$version" || { echo "tag $GITHUB_REF_NAME != version $version"; exit 1; }
+      - uses: pypa/gh-action-pypi-publish@release/v1
