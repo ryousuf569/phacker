@@ -1,0 +1,37 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "phacker"
+version = "0.1.0"
+description = "Probability of backtest overfitting via CSCV (Bailey et al. 2016), with a C++ kernel"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.24", "pandas>=2.0"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["src/phacker"]
+sdist.exclude = ["*.pdf", "phacker-project-spec.md", ".github"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-*"
+skip = "*-musllinux_* *-win32 *_i686"
+test-extras = ["test"]
+# fail if the kernel silently fell back to NumPy, then run the full suite against the wheel
+test-command = "python -c \"import phacker; assert phacker.backend() == 'cpp'\" && pytest {project}/tests"
+
+[tool.cibuildwheel.windows]
+# bundle vcomp140.dll (MSVC's OpenMP runtime), which Python does not ship
+before-build = "pip install delvewheel"
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "10.15" }

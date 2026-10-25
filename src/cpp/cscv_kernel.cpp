@@ -65,8 +65,11 @@ int64_t lex_rank(uint32_t mask, int S, int k) {
     return r;
 }
 
+// A flat half (a config that never trades there) scores 0, as in cscv.sharpe.
+// b - a^2/n carries rounding of order eps * b, so flatness is judged against b.
 inline double sharpe(double mu, double a, double b, double n) {
-    return (mu + a / n) / std::sqrt((b - a * a / n) / (n - 1));
+    const double ss = b - a * a / n;
+    return ss <= 1e-12 * b ? 0.0 : (mu + a / n) / std::sqrt(ss / (n - 1));
 }
 
 }  // namespace

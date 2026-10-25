@@ -1,0 +1,46 @@
+name: wheels
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  wheels:
+    name: wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # native runners for each arch, so no emulation or cross-compiling
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-15-intel, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/cibuildwheel@v4.3.4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  numpy-reference:
+    # the pure-Python path the package falls back to without a compiler
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install numpy pandas pytest
+      - run: pytest
